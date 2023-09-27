@@ -13,10 +13,14 @@ func TestServerEndpoints(t *testing.T) {
 		name, endpoint, method string
 		statusCode             int
 	}{
-		{"all todos", "/todo/", http.MethodGet, 200},
+		{"all todos", "/todos/", http.MethodGet, 200},
+		{"get one todo", "/todo/1/", http.MethodGet, 200},
+		{"create todo", "/todo/", http.MethodPost, 201},
+		{"update todo", "/todo/1/", http.MethodPut, 200},
+		{"delete todo", "/todo/1/", http.MethodDelete, 200},
 	}
 
-	s := httptest.NewServer(server.TodoApiServeMux{})
+	s := httptest.NewServer(server.NewTodoApiServeMux())
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
