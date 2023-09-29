@@ -1,26 +1,34 @@
 package server_test
 
 import (
+	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/manasm11/yt-todolist/pkg/server"
+	"github.com/manasm11/yt-todolist/pkg/todo"
 )
 
+var s = httptest.NewServer(server.NewTodoApiServeMux())
+
 func TestServerEndpoints(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name, endpoint, method string
 		statusCode             int
+		checkResponseContent   func(io.ReadCloser) bool
 	}{
-		{"all todos", "/todos/", http.MethodGet, 200},
-		{"get one todo", "/todo/1/", http.MethodGet, 200},
-		{"create todo", "/todo/", http.MethodPost, 201},
-		{"update todo", "/todo/1/", http.MethodPut, 200},
-		{"delete todo", "/todo/1/", http.MethodDelete, 200},
+		{"all todos", "/api/todo/", http.MethodGet, 200, checkTodosList},
+		{"get one todo", "/api/todo/1/", http.MethodGet, 200, checkTodo},
+		{"create todo", "/api/todo", http.MethodPost, 201, checkTodo},
+		{"update todo", "/api/todo/1", http.MethodPut, 200, checkTodo},
+		{"delete todo", "/api/todo/1/", http.MethodDelete, 200, nil},
+		{"incorrect endpoint", "/wrongendpoint", http.MethodGet, 404, nil},
+		{"incorrect enpoint starting with /api", "/api/wrongendpoint", http.MethodGet, 404, nil},
 	}
-
-	s := httptest.NewServer(server.NewTodoApiServeMux())
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -29,8 +37,20 @@ func TestServerEndpoints(t *testing.T) {
 			res, err := http.DefaultClient.Do(req)
 			ok(t, err)
 			assertStatus(t, res, tt.statusCode)
+			if tt.checkResponseContent != nil {
+				assert(t, tt.checkResponseContent(res.Body), "incorrect response content: %v", res.Body)
+			}
 		})
 	}
+
+}
+
+func checkTodosList(body io.ReadCloser) bool {
+	return json.NewDecoder(body).Decode(&[]todo.Todo{}) == nil
+}
+
+func checkTodo(body io.ReadCloser) bool {
+	return json.NewDecoder(body).Decode(&todo.Todo{}) == nil
 }
 
 func ok(t testing.TB, err error) {
